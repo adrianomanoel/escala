@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escala da Operação Diária</title>
+    
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f0f2f5;
+            margin: 0;
+            padding: 15px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 98%; 
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+        }
+
+        h1 {
+            color: #1a73e8;
+            margin: 0 0 5px 0;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        #status {
+            color: #1a73e8;
+            font-weight: bold;
+            margin-bottom: 20px;
+            font-size: 15px;
+            text-align: center;
+            padding: 10px;
+            background: #e8f0fe;
+            border-radius: 6px;
+        }
+
+        /* Painel Admin */
+        .painel-admin {
+            display: none;
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 2px dashed #ffc107;
+            text-align: center;
+        }
+
+        .upload-box {
+            display: inline-block;
+            margin: 5px 20px;
+            text-align: left;
+        }
+
+        .upload-box label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: #856404;
+        }
+
+        /* LAYOUT LADO A LADO */
+        .grade-escalas {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+        }
+
+        .bloco-escala {
+            flex: 1; 
+            background: #fafafa;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            box-sizing: border-box;
+        }
+
+        .bloco-escala h2 {
+            font-size: 18px;
+            color: #444;
+            margin: 0 0 10px 0;
+            border-bottom: 2px solid #1a73e8;
+            padding-bottom: 5px;
+            text-align: left;
+        }
+
+        .img-print {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        input[type="file"] {
+            background: white;
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+
+    <script>
+        // Configuração do seu Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDzKdQzEZfVQ1uvR4wZonOK7qbVfsRWWPc",
+            authDomain: "escalas-e733b.firebaseapp.com",
+            databaseURL: "https://escalas-e733b-default-rtdb.firebaseio.com",
+            projectId: "escalas-e733b",
+            storageBucket: "escalas-e733b.firebasestorage.app",
+            messagingSenderId: "773745561687",
+            appId: "1:773745561687:web:8a25cfa8809a548e349312",
+            measurementId: "G-ERTHCK9HW6"
+        };
+
+        // Inicialização
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const storage = firebase.storage();
+
+        // Controle de Acesso por Senha
+        function verificarAcesso() {
+            const perfil = prompt("Selecione o perfil de acesso:\n1 - Funcionário (Apenas Visualizar)\n2 - Administrador (Importar Escalas)");
+            
+            if (perfil === "1") {
+                let senha = prompt("Digite a senha da Operação:");
+                if (senha === "1234") {
+                    liberarTela(false);
+                } else {
+                    alert("Senha incorreta!");
+                    window.location.reload();
+                }
+            } else if (perfil === "2") {
+                let senhaAdmin = prompt("Digite a senha Master:");
+                if (senhaAdmin === "admin99") {
+                    liberarTela(true);
+                } else {
+                    alert("Senha Master incorreta!");
+                    window.location.reload();
+                }
+            } else {
+                alert("Opção inválida.");
+                window.location.reload();
+            }
+        }
+
+        function SkinnerBoxLog(msg) {
+            document.getElementById("status").innerText = msg;
+        }
+
+        function liberarTela(isAdmin) {
+            document.getElementById("conteudo-principal").style.display = "block";
+            if (isAdmin) {
+                document.getElementById("area-upload").style.display = "block";
+            }
+            ouvirBancoDeDados();
+        }
+
+        // Monitora o Banco e exibe os links puros direto na tela
+        function ouvirBancoDeDados() {
+            SkinnerBoxLog("Conectando ao banco de dados e buscando escalas...");
+            
+            db.ref('escalas').on('value', (snapshot) => {
+                const dados = snapshot.val();
+                if (dados) {
+                    // Links atribuídos diretamente sem quebras de texto adicionais
+                    if(dados.link1) document.getElementById("img-escala1").src = dados.link1;
+                    if(dados.link2) document.getElementById("img-escala2").src = dados.link2;
+                    SkinnerBoxLog("Escalas do dia atualizadas com sucesso!");
+                } else {
+                    SkinnerBoxLog("O sistema está pronto, mas nenhuma escala foi importada hoje.");
+                }
+            }, (error) => {
+                SkinnerBoxLog("Erro crítico de leitura no Banco de Dados: " + error.message);
+            });
+        }
+
+        // Faz o upload substituindo o arquivo antigo e atualiza o link correto
+        async function importarEscala(idInput, nomeCampo) {
+            const arquivo = document.getElementById(idInput).files[0];
+            if (!arquivo) return;
+
+            SkinnerBoxLog("Passo 1/3: Enviando arquivo PNG para a nuvem...");
+
+            try {
+                const metadados = { contentType: 'image/png' };
+                const storageRef = storage.ref(`escalas/${nomeCampo}.png`);
+                
+                // Envia a imagem para o Storage
+                await storageRef.put(arquivo, metadados);
+                SkinnerBoxLog("Passo 2/3: Gerando link de visualização seguro...");
+
+                // Pega a URL pública gerada
+                const urlDownload = await storageRef.getDownloadURL();
+                SkinnerBoxLog("Passo 3/3: Registrando link no painel dos funcionários...");
+
+                // Grava no Realtime Database
+                await db.ref(`escalas/${nomeCampo}`).set(urlDownload);
+
+                SkinnerBoxLog("Sucesso! Nova escala publicada e visível para a operação.");
+                document.getElementById(idInput).value = ""; 
+            } catch (error) {
+                console.error(error);
+                alert("Falha na importação.\n\nVerifique se as abas 'Rules' do seu Realtime Database e do seu Storage no painel do Firebase estão configuradas como públicas (true).\n\nErro original: " + error.message);
+                SkinnerBoxLog("Erro no processo de importação.");
+            }
+        }
+
+        window.onload = verificarAcesso;
+    </script>
+</head>
+<body>
+
+    <div id="conteudo-principal" style="display: none;">
+        <div class="container">
+            <h1>Escala da Operação</h1>
+            <div id="status">Iniciando sistemas...</div>
+
+            <div id="area-upload" class="painel-admin">
+                <h3>⚙️ Painel de Substituição de Escalas (Administrador)</h3>
+                <div class="upload-box">
+                    <label for="input-escala1">Substituir Escala 1 (.png):</label>
+                    <input type="file" id="input-escala1" accept=".png" onchange="importarEscala('input-escala1', 'link1')">
+                </div>
+                <div class="upload-box">
+                    <label for="input-escala2">Substituir Escala 2 (.png):</label>
+                    <input type="file" id="input-escala2" accept=".png" onchange="importarEscala('input-escala2', 'link2')">
+                </div>
+            </div>
+
+            <div class="grade-escalas">
+                <div class="bloco-escala">
+                    <h2>Escala 01</h2>
+                    <img id="img-escala1" src="" alt="Aguardando publicação do print da escala 1." class="img-print">
+                </div>
+                
+                <div class="bloco-escala">
+                    <h2>Escala 02</h2>
+                    <img id="img-escala2" src="" alt="Aguardando publicação do print da escala 2." class="img-print">
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
