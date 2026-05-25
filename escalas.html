@@ -41,7 +41,6 @@
             border-radius: 6px;
         }
 
-        /* Painel Admin */
         .painel-admin {
             display: none;
             background: #fff3cd;
@@ -65,7 +64,6 @@
             color: #856404;
         }
 
-        /* LAYOUT LADO A LADO */
         .grade-escalas {
             display: flex;
             gap: 15px;
@@ -99,6 +97,8 @@
             display: block;
             margin: 0 auto;
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            background-color: #eee;
+            min-height: 100px;
         }
 
         input[type="file"] {
@@ -112,10 +112,9 @@
 
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
 
     <script>
-        // Configuração do seu Firebase
+        // Sua configuração do Firebase
         const firebaseConfig = {
             apiKey: "AIzaSyDzKdQzEZfVQ1uvR4wZonOK7qbVfsRWWPc",
             authDomain: "escalas-e733b.firebaseapp.com",
@@ -127,12 +126,10 @@
             measurementId: "G-ERTHCK9HW6"
         };
 
-        // Inicialização
+        // Inicializa o Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
-        const storage = firebase.storage();
 
-        // Controle de Acesso por Senha
         function verificarAcesso() {
             const perfil = prompt("Selecione o perfil de acesso:\n1 - Funcionário (Apenas Visualizar)\n2 - Administrador (Importar Escalas)");
             
@@ -158,7 +155,7 @@
             }
         }
 
-        function SkinnerBoxLog(msg) {
+        function notificar(msg) {
             document.getElementById("status").innerText = msg;
         }
 
@@ -167,57 +164,57 @@
             if (isAdmin) {
                 document.getElementById("area-upload").style.display = "block";
             }
-            ouvirBancoDeDados();
+            carregarImagens();
         }
 
-        // Monitora o Banco e exibe os links puros direto na tela
-        function ouvirBancoDeDados() {
-            SkinnerBoxLog("Conectando ao banco de dados e buscando escalas...");
+        // Puxa as imagens codificadas direto do Banco de Dados
+        function carregarImagens() {
+            notificar("Conectando ao banco de dados...");
             
             db.ref('escalas').on('value', (snapshot) => {
                 const dados = snapshot.val();
                 if (dados) {
-                    // Links atribuídos diretamente sem quebras de texto adicionais
-                    if(dados.link1) document.getElementById("img-escala1").src = dados.link1;
-                    if(dados.link2) document.getElementById("img-escala2").src = dados.link2;
-                    SkinnerBoxLog("Escalas do dia atualizadas com sucesso!");
+                    if(dados.escala1) {
+                        document.getElementById("img-escala1").src = dados.escala1;
+                    }
+                    if(dados.escala2) {
+                        document.getElementById("img-escala2").src = dados.escala2;
+                    }
+                    notificar("Escalas sincronizadas e atualizadas!");
                 } else {
-                    SkinnerBoxLog("O sistema está pronto, mas nenhuma escala foi importada hoje.");
+                    notificar("Sistema online. Nenhuma escala registrada ainda.");
                 }
             }, (error) => {
-                SkinnerBoxLog("Erro crítico de leitura no Banco de Dados: " + error.message);
+                alert("Erro de Permissão. Verifique se as Regras do Realtime Database estão como 'true'.");
             });
         }
 
-        // Faz o upload substituindo o arquivo antigo e atualiza o link correto
-        async function importarEscala(idInput, nomeCampo) {
+        // Converte a Imagem em Texto Base64 e joga direto no Realtime Database (Bypassa o Storage)
+        function importarEscala(idInput, nomeCampo) {
             const arquivo = document.getElementById(idInput).files[0];
             if (!arquivo) return;
 
-            SkinnerBoxLog("Passo 1/3: Enviando arquivo PNG para a nuvem...");
+            notificar("Processando a imagem e enviando para o banco de dados... Aguarde.");
 
-            try {
-                const metadados = { contentType: 'image/png' };
-                const storageRef = storage.ref(`escalas/${nomeCampo}.png`);
+            const leitor = new FileReader();
+            
+            // Quando terminar de ler a imagem no computador...
+            leitor.onload = async function(evento) {
+                const imagemBase64 = evento.target.result; // Imagem convertida para texto
                 
-                // Envia a imagem para o Storage
-                await storageRef.put(arquivo, metadados);
-                SkinnerBoxLog("Passo 2/3: Gerando link de visualização seguro...");
-
-                // Pega a URL pública gerada
-                const urlDownload = await storageRef.getDownloadURL();
-                SkinnerBoxLog("Passo 3/3: Registrando link no painel dos funcionários...");
-
-                // Grava no Realtime Database
-                await db.ref(`escalas/${nomeCampo}`).set(urlDownload);
-
-                SkinnerBoxLog("Sucesso! Nova escala publicada e visível para a operação.");
-                document.getElementById(idInput).value = ""; 
-            } catch (error) {
-                console.error(error);
-                alert("Falha na importação.\n\nVerifique se as abas 'Rules' do seu Realtime Database e do seu Storage no painel do Firebase estão configuradas como públicas (true).\n\nErro original: " + error.message);
-                SkinnerBoxLog("Erro no processo de importação.");
-            }
+                try {
+                    // Salva direto no Realtime Database
+                    await db.ref(`escalas/${nomeCampo}`).set(imagemBase64);
+                    
+                    notificar("Sucesso! Escala enviada e visível para a operação.");
+                    document.getElementById(idInput).value = ""; // Limpa o botão
+                } catch (erro) {
+                    alert("Falha ao salvar no banco. Vá no painel do Firebase > Realtime Database > Rules e coloque read/write como true.\n\nErro original: " + erro.message);
+                }
+            };
+            
+            // Inicia a leitura do arquivo como imagem URL
+            leitor.readAsDataURL(arquivo);
         }
 
         window.onload = verificarAcesso;
@@ -231,26 +228,26 @@
             <div id="status">Iniciando sistemas...</div>
 
             <div id="area-upload" class="painel-admin">
-                <h3>⚙️ Painel de Substituição de Escalas (Administrador)</h3>
+                <h3>⚙️ Painel de Substituição Diária (Administrador)</h3>
                 <div class="upload-box">
-                    <label for="input-escala1">Substituir Escala 1 (.png):</label>
-                    <input type="file" id="input-escala1" accept=".png" onchange="importarEscala('input-escala1', 'link1')">
+                    <label for="input-escala1">Substituir Escala 01 (.png ou .jpg):</label>
+                    <input type="file" id="input-escala1" accept="image/*" onchange="importarEscala('input-escala1', 'escala1')">
                 </div>
                 <div class="upload-box">
-                    <label for="input-escala2">Substituir Escala 2 (.png):</label>
-                    <input type="file" id="input-escala2" accept=".png" onchange="importarEscala('input-escala2', 'link2')">
+                    <label for="input-escala2">Substituir Escala 02 (.png ou .jpg):</label>
+                    <input type="file" id="input-escala2" accept="image/*" onchange="importarEscala('input-escala2', 'escala2')">
                 </div>
             </div>
 
             <div class="grade-escalas">
                 <div class="bloco-escala">
                     <h2>Escala 01</h2>
-                    <img id="img-escala1" src="" alt="Aguardando publicação do print da escala 1." class="img-print">
+                    <img id="img-escala1" src="" alt="Aguardando a importação da Escala 01..." class="img-print">
                 </div>
                 
                 <div class="bloco-escala">
                     <h2>Escala 02</h2>
-                    <img id="img-escala2" src="" alt="Aguardando publicação do print da escala 2." class="img-print">
+                    <img id="img-escala2" src="" alt="Aguardando a importação da Escala 02..." class="img-print">
                 </div>
             </div>
         </div>
